@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Stock Analyzer • Buy/Sell Counts & Drill-down</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #f4f7fc;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px 16px;
+      color: #1e293b;
+    }
+
+    .container {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    .header h1 {
+      font-size: 1.9rem;
+      font-weight: 600;
+      background: linear-gradient(145deg, #123456, #1f5a8e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .date-badge {
+      background: #e0f2fe;
+      color: #0369a1;
+      padding: 5px 14px;
+      border-radius: 30px;
+      font-weight: 500;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 20px 0 30px;
+      align-items: center;
+    }
+
+    .upload-btn, .print-btn {
+      background: white;
+      border: 1px solid #cbd5e1;
+      padding: 10px 22px;
+      border-radius: 40px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.15s;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+
+    .upload-btn:hover, .print-btn:hover {
+      background: #e6edf5;
+      border-color: #94a3b8;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .status {
+      background: #eaf3fa;
+      padding: 8px 18px;
+      border-radius: 40px;
+      font-size: 0.9rem;
+      color: #254a77;
+    }
+
+    /* Recommendation summary cards */
+    .rec-summary {
+      display: flex;
+      gap: 20px;
+      margin: 30px 0 20px;
+      flex-wrap: wrap;
+    }
+
+    .rec-card {
+      background: white;
+      border-radius: 24px;
+      padding: 18px 28px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+      border: 1px solid #dee7f0;
+      min-width: 160px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .rec-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0,30,70,0.1);
+    }
+
+    .rec-card.buy { border-left: 6px solid #0d9488; }
+    .rec-card.sell { border-left: 6px solid #b91c1c; }
+    .rec-card.neutral { border-left: 6px solid #eab308; }
+
+    .rec-label {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #5f6c84;
+    }
+
+    .rec-count {
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    /* tabs */
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 35px 0 20px;
+      border-bottom: 1px solid #d0ddee;
+      padding-bottom: 8px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: #5b687b;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+
+    .tab-btn.active {
+      background: #1e2f4a;
+      color: white;
+    }
+
+    .tab-btn:not(.active):hover {
+      background: #e6edf5;
+    }
+
+    .table-wrapper {
+      background: white;
+      border-radius: 20px;
+      border: 1px solid #eaeef3;
+      overflow-x: auto;
+      margin-bottom: 40px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      min-width: 700px;
+    }
+
+    th {
+      text-align: left;
+      padding: 16px 16px;
+      background: #f9fcff;
+      font-weight: 600;
+      color: #1f3a5f;
+      border-bottom: 2px solid #dce5ef;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #ecf1f7;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #e6f0ff;
+      color: #1d4ed8;
+      padding: 4px 10px;
+      border-radius: 30px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 5px;
+      margin-bottom: 3px;
+      white-space: nowrap;
+    }
+
+    .badge.buy { background: #d1fae5; color: #0b5e42; }
+    .badge.sell { background: #fee2e2; color: #991b1b; }
+    .badge.neutral { background: #fef9c3; color: #854d0e; }
+
+    .positive { color: #0d9488; font-weight: 600; }
+    .negative { color: #b91c1c; font-weight: 600; }
+
+    /* popup dialog */
+    dialog {
+      border: none;
+      border-radius: 28px;
+      padding: 24px;
+      width: 80%;
+      max-width: 1000px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+
+    dialog::backdrop {
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(3px);
+    }
+
+    .dialog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .dialog-header h2 {
+      font-size: 1.6rem;
+    }
+
+    .close-btn {
+      background: #f1f5f9;
+      border: none;
+      font-size: 1.8rem;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #334155;
+    }
+
+    .close-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .dialog-table-wrapper {
+      max-height: 60vh;
+      overflow-y: auto;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+    }
+
+    footer {
+      margin-top: 50px;
+      color: #6b7b8f;
+      font-size: 0.85rem;
+      text-align: center;
+      border-top: 1px solid #d7e0e8;
+      padding-top: 25px;
+    }
+
+    @media print {
+      .toolbar, .tabs, .rec-summary, .upload-btn, .print-btn, footer, dialog {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>📈 Multi‑File Analyzer with Buy/Sell Counts</h1>
+    <span class="date-badge" id="current-date"></span>
+  </div>
+
+  <div class="toolbar">
+    <label for="file-input" class="upload-btn">📂 Upload 12 CSV files</label>
+    <input type="file" id="file-input" multiple accept=".csv">
+    <button class="print-btn" onclick="window.print()">🖨️ Print report</button>
+    <span class="status" id="status">Ready – using default data</span>
+  </div>
+
+  <!-- Recommendation summary cards (clickable) -->
+  <div class="rec-summary" id="recSummary"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="overview">📊 Overview</button>
+    <button class="tab-btn" data-tab="advance">🚀 Advance</button>
+    <button class="tab-btn" data-tab="decline">📉 Decline</button>
+    <button class="tab-btn" data-tab="high52">📈 52W High</button>
+    <button class="tab-btn" data-tab="low52">📉 52W Low</button>
+    <button class="tab-btn" data-tab="volgain">🔥 Vol Gainers</button>
+    <button class="tab-btn" data-tab="largedeals">🤝 Large Deals</button>
+    <button class="tab-btn" data-tab="band">🎢 Upper/Lower</button>
+  </div>
+
+  <div id="tab-content-area"></div>
+
+  <!-- Dialog for recommendation details -->
+  <dialog id="recDialog">
+    <div class="dialog-header">
+      <h2 id="dialogTitle">BUY Stocks</h2>
+      <button class="close-btn" onclick="document.getElementById('recDialog').close()">✕</button>
+    </div>
+    <div id="dialogContent" class="dialog-table-wrapper"></div>
+  </dialog>
+
+  <footer>
+    ⚡ Click on BUY/SELL/NEUTRAL cards to see detailed lists. Upload 12 CSV files. Data auto‑saves.
+  </footer>
+</div>
+
+<script>
+  (function() {
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+    const today = formatDate(new Date());
+
+    function parseCSV(text) {
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+      if (lines.length === 0) return { headers: [], rows: [] };
+      const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        const fields = [];
+        let inQuote = false;
+        let current = '';
+        for (let j = 0; j < line.length; j++) {
+          const ch = line[j];
+          if (ch === '"') {
+            inQuote = !inQuote;
+          } else if (ch === ',' && !inQuote) {
+            fields.push(current.replace(/^"|"$/g, '').trim());
+            current = '';
+          } else {
+            current += ch;
+          }
+        }
+        fields.push(current.replace(/^"|"$/g, '').trim());
+        if (fields.length === headers.length) {
+          const row = {};
+          headers.forEach((h, idx) => row[h] = fields[idx]);
+          rows.push(row);
+        }
+      }
+      return { headers, rows };
+    }
+
+    const DEFAULT_DATA = {
+      stocksTraded: { rows: [] },
+      advance: { rows: [] },
+      decline: { rows: [] },
+      high52: { rows: [] },
+      low52: { rows: [] },
+      volumeGainers: { rows: [] },
+      largeDeals: { rows: [] },
+      upperBand: { rows: [] },
+      lowerBand: { rows: [] },
+      t20Gainers: { rows: [] },
+      t20Losers: { rows: [] },
+      maEquities: { rows: [] }
+    };
+
+    let storedData = null;
+    const storageKey = `stock_report_${today}`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) storedData = JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+
+    let reportData = storedData || DEFAULT_DATA;
+    updateStatus(storedData ? `Loaded data for ${today}` : 'Using default sample (recommendations based on sample)');
+
+    // ----- recommendation logic (same as before) -----
+    function getRecommendation(symbol) {
+      if (!symbol) return 'NEUTRAL';
+      let score = 0;
+      if (reportData.advance.rows.some(r => (r.Symbol || r.symbol) === symbol)) score += 2;
+      if (reportData.high52.rows.some(r => (r.Symbol || r.symbol) === symbol)) score += 2;
+      if (reportData.upperBand.rows.some(r => (r.Symbol || r.symbol) === symbol)) score += 2;
+      if (reportData.volumeGainers.rows.some(r => (r.SYMBOL || r.symbol) === symbol)) score += 1;
+      if (reportData.t20Gainers.rows.some(r => (r.Symbol || r.symbol) === symbol)) score += 1;
+
+      if (reportData.decline.rows.some(r => (r.Symbol || r.symbol) === symbol)) score -= 2;
+      if (reportData.low52.rows.some(r => (r.Symbol || r.symbol) === symbol)) score -= 2;
+      if (reportData.lowerBand.rows.some(r => (r.Symbol || r.symbol) === symbol)) score -= 2;
+      if (reportData.t20Losers.rows.some(r => (r.Symbol || r.symbol) === symbol)) score -= 1;
+
+      if (score >= 2) return 'BUY';
+      if (score <= -2) return 'SELL';
+      return 'NEUTRAL';
+    }
+
+    // Get all stocks with their recommendation (from stocksTraded)
+    function getAllStocksWithRec() {
+      return (reportData.stocksTraded.rows || []).map(row => {
+        const symbol = row.Symbol || row.symbol;
+        const ltp = row.LTP || row.ltp || '-';
+        const chng = row['%chng'] || row.chng || '0';
+        const vol = row.Volume || row.volume || '-';
+        const val = row.Value || row.value || '-';
+        const rec = getRecommendation(symbol);
+        // collect featured lists (simplified)
+        let featured = [];
+        if (reportData.advance.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Adv');
+        if (reportData.decline.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Dec');
+        if (reportData.high52.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('52WH');
+        if (reportData.low52.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('52WL');
+        if (reportData.volumeGainers.rows.some(r => (r.SYMBOL || r.symbol) === symbol)) featured.push('Vol');
+        if (reportData.largeDeals.rows.some(r => (r.SYMBOL || r.symbol) === symbol)) featured.push('Deals');
+        if (reportData.upperBand.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Up');
+        if (reportData.lowerBand.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Low');
+        return { symbol, ltp, chng, vol, val, rec, featured: featured.join(', ') };
+      }).filter(s => s.symbol);
+    }
+
+    // Render summary cards with counts
+    function renderRecSummary() {
+      const stocks = getAllStocksWithRec();
+      const buyCount = stocks.filter(s => s.rec === 'BUY').length;
+      const sellCount = stocks.filter(s => s.rec === 'SELL').length;
+      const neutralCount = stocks.filter(s => s.rec === 'NEUTRAL').length;
+
+      const container = document.getElementById('recSummary');
+      container.innerHTML = `
+        <div class="rec-card buy" data-rec="BUY">
+          <div class="rec-label">BUY</div>
+          <div class="rec-count">${buyCount}</div>
+        </div>
+        <div class="rec-card sell" data-rec="SELL">
+          <div class="rec-label">SELL</div>
+          <div class="rec-count">${sellCount}</div>
+        </div>
+        <div class="rec-card neutral" data-rec="NEUTRAL">
+          <div class="rec-label">NEUTRAL</div>
+          <div class="rec-count">${neutralCount}</div>
+        </div>
+      `;
+
+      // Attach click handlers
+      document.querySelectorAll('.rec-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const recType = card.dataset.rec;
+          showRecDialog(recType, stocks);
+        });
+      });
+    }
+
+    // Show dialog with filtered stocks
+    function showRecDialog(recType, allStocks) {
+      const filtered = allStocks.filter(s => s.rec === recType);
+      const dialog = document.getElementById('recDialog');
+      document.getElementById('dialogTitle').innerText = `${recType} Stocks (${filtered.length})`;
+
+      let html = `<table><thead><tr><th>Symbol</th><th>LTP (₹)</th><th>%chng</th><th>Volume (L)</th><th>Value (Cr)</th><th>Featured</th></tr></thead><tbody>`;
+      filtered.forEach(s => {
+        const changeClass = parseFloat(s.chng) >= 0 ? 'positive' : 'negative';
+        html += `<tr>
+          <td><strong>${s.symbol}</strong></td>
+          <td>${s.ltp}</td>
+          <td class="${changeClass}">${s.chng}%</td>
+          <td>${s.vol}</td>
+          <td>${s.val}</td>
+          <td>${s.featured || '—'}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+      document.getElementById('dialogContent').innerHTML = html;
+      dialog.showModal();
+    }
+
+    // ----- render functions for tabs -----
+    function renderOverview() {
+      const rows = reportData.stocksTraded.rows.slice(0, 20);
+      let html = `<div class="table-wrapper"><table><thead><tr><th>Symbol</th><th>LTP (₹)</th><th>%chng</th><th>Volume (L)</th><th>Value (Cr)</th><th>Featured Lists</th><th>Recommendation</th></tr></thead><tbody>`;
+      rows.forEach(row => {
+        const symbol = row.Symbol || row.symbol || '-';
+        const ltp = row.LTP || row.ltp || '-';
+        const chng = row['%chng'] || row.chng || '0';
+        const vol = row.Volume || row.volume || '-';
+        const val = row.Value || row.value || '-';
+        const changeClass = parseFloat(chng) >= 0 ? 'positive' : 'negative';
+
+        let featured = [];
+        if (reportData.advance.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Advance');
+        if (reportData.decline.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Decline');
+        if (reportData.high52.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('52WH');
+        if (reportData.low52.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('52WL');
+        if (reportData.volumeGainers.rows.some(r => (r.SYMBOL || r.symbol) === symbol)) featured.push('VolGain');
+        if (reportData.largeDeals.rows.some(r => (r.SYMBOL || r.symbol) === symbol)) featured.push('Deals');
+        if (reportData.upperBand.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Upper');
+        if (reportData.lowerBand.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('Lower');
+        if (reportData.t20Gainers.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('T20G');
+        if (reportData.t20Losers.rows.some(r => (r.Symbol || r.symbol) === symbol)) featured.push('T20L');
+
+        const badges = featured.map(f => `<span class="badge">${f}</span>`).join(' ');
+        const rec = getRecommendation(symbol);
+        let recClass = 'neutral';
+        if (rec === 'BUY') recClass = 'buy';
+        else if (rec === 'SELL') recClass = 'sell';
+        const recBadge = `<span class="badge ${recClass}">${rec}</span>`;
+
+        html += `<tr><td><strong>${symbol}</strong></td><td>${ltp}</td><td class="${changeClass}">${chng}%</td><td>${vol}</td><td>${val}</td><td>${badges || '—'}</td><td>${recBadge}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function renderTable(rows, cols) {
+      if (!rows || rows.length === 0) return `<p>No data</p>`;
+      let html = `<div class="table-wrapper"><table><thead><tr>`;
+      cols.forEach(col => html += `<th>${col}</th>`);
+      html += `</tr></thead><tbody>`;
+      rows.slice(0, 15).forEach(row => {
+        html += `<tr>`;
+        cols.forEach(col => {
+          let val = row[col] || '-';
+          if (col.includes('%chng') || col.includes('CHNG')) {
+            const cls = parseFloat(val) >= 0 ? 'positive' : 'negative';
+            html += `<td class="${cls}">${val}</td>`;
+          } else {
+            html += `<td>${val}</td>`;
+          }
+        });
+        html += `</tr>`;
+      });
+      html += '</tbody></table></div>';
+      return html;
+    }
+
+    function renderAllTabs() {
+      const area = document.getElementById('tab-content-area');
+      const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab || 'overview';
+      let content = '';
+
+      if (activeTab === 'overview') content = renderOverview();
+      else if (activeTab === 'advance') content = renderTable(reportData.advance.rows, ['Symbol', 'LTP', '%chng', 'Mkt Cap (₹ Crores)']);
+      else if (activeTab === 'decline') content = renderTable(reportData.decline.rows, ['Symbol', 'LTP', '%chng', 'Mkt Cap (₹ Crores)']);
+      else if (activeTab === 'high52') content = renderTable(reportData.high52.rows, ['Symbol', 'LTP', 'New 52W/H price', 'Prev.High']);
+      else if (activeTab === 'low52') content = renderTable(reportData.low52.rows, ['Symbol', 'LTP', 'New 52W/L price', 'Prev.Low']);
+      else if (activeTab === 'volgain') content = renderTable(reportData.volumeGainers.rows, ['SYMBOL', 'TODAY - LTP', 'TODAY - % CHNG', '1 WEEK - CHANGE']);
+      else if (activeTab === 'largedeals') content = renderTable(reportData.largeDeals.rows, ['SYMBOL', 'CLIENT NAME', 'BUY/SELL', 'QUANTITY TRADED', 'TRADE PRICE/ WEIGHTED. AVG. PRICE']);
+      else if (activeTab === 'band') {
+        const upper = reportData.upperBand.rows || [];
+        const lower = reportData.lowerBand.rows || [];
+        const combined = [...upper.slice(0,7), ...lower.slice(0,7)];
+        content = renderTable(combined, ['Symbol', 'LTP', '%chng', 'Price Band %']);
+      }
+
+      area.innerHTML = content;
+      renderRecSummary(); // update counts whenever tabs change
+    }
+
+    function updateStatus(msg) {
+      document.getElementById('status').innerText = msg;
+    }
+
+    // file upload
+    document.getElementById('file-input').addEventListener('change', async function(e) {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      updateStatus(`Processing ${files.length} files...`);
+
+      const newData = {
+        stocksTraded: { rows: [] },
+        advance: { rows: [] },
+        decline: { rows: [] },
+        high52: { rows: [] },
+        low52: { rows: [] },
+        volumeGainers: { rows: [] },
+        largeDeals: { rows: [] },
+        upperBand: { rows: [] },
+        lowerBand: { rows: [] },
+        t20Gainers: { rows: [] },
+        t20Losers: { rows: [] },
+        maEquities: { rows: [] }
+      };
+
+      for (const file of files) {
+        const name = file.name.toLowerCase();
+        const text = await file.text();
+        const parsed = parseCSV(text);
+        if (name.includes('52weekhigh')) newData.high52 = parsed;
+        else if (name.includes('52weeklow')) newData.low52 = parsed;
+        else if (name.includes('advance')) newData.advance = parsed;
+        else if (name.includes('decline')) newData.decline = parsed;
+        else if (name.includes('stocks traded') || name.includes('stockstraded') || name.includes('stockstraded')) newData.stocksTraded = parsed;
+        else if (name.includes('volume-gainers') || name.includes('la-volume')) newData.volumeGainers = parsed;
+        else if (name.includes('large-deals') || name.includes('largedeals')) newData.largeDeals = parsed;
+        else if (name.includes('upper band')) newData.upperBand = parsed;
+        else if (name.includes('lower band')) newData.lowerBand = parsed;
+        else if (name.includes('t20-gl-gainers')) newData.t20Gainers = parsed;
+        else if (name.includes('t20-gl-loosers')) newData.t20Losers = parsed;
+        else if (name.includes('ma-equities')) newData.maEquities = parsed;
+      }
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(newData));
+        reportData = newData;
+        updateStatus(`Saved for ${today} (${files.length} files)`);
+        renderAllTabs();
+      } catch (e) {
+        alert('Failed to save data, but analysis is shown.');
+        reportData = newData;
+        renderAllTabs();
+      }
+    });
+
+    // tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderAllTabs();
+      });
+    });
+
+    document.getElementById('current-date').innerText = today;
+    renderAllTabs();
+  })();
+</script>
+</body>
+</html>
